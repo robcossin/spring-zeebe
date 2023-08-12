@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.JsonMapper;
+import io.camunda.zeebe.client.impl.ZeebeClientImpl;
 import io.camunda.zeebe.spring.client.CamundaAutoConfiguration;
-import io.camunda.zeebe.spring.client.configuration.ZeebeClientAllAutoConfiguration;
 import io.camunda.zeebe.spring.client.configuration.ZeebeClientManagedChannelFactory;
 import io.camunda.zeebe.spring.client.configuration.ZeebeClientProdAutoConfiguration;
+import io.camunda.zeebe.spring.client.properties.ZeebeClientConfigurationProperties;
+import io.grpc.ManagedChannel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +41,25 @@ import static org.assertj.core.api.Assertions.assertThat;
     "zeebe.client.security.plaintext=true"
   }
 )
-@ContextConfiguration(classes = { CamundaAutoConfiguration.class, ZeebeClientStarterAutoConfigurationTest.TestConfig.class })
-public class ZeebeClientStarterAutoConfigurationTest {
+@ContextConfiguration(classes = {CamundaAutoConfiguration.class, ZeebeClientStarterAutoConfigurationCustomZeebeClientManagedChannelFactoryTest.TestConfig.class})
+public class ZeebeClientStarterAutoConfigurationCustomZeebeClientManagedChannelFactoryTest {
 
   public static class TestConfig {
     @Bean
     public ObjectMapper objectMapper() {
       return new ObjectMapper();
+    }
+
+    @Bean
+    public ZeebeClientManagedChannelFactory customZeebeChannelFactory() {
+      return new TestZeebeClientManagedChannelFactory();
+    }
+
+    private static class TestZeebeClientManagedChannelFactory implements ZeebeClientManagedChannelFactory {
+      @Override
+      public ManagedChannel createChannel(ZeebeClientConfigurationProperties configurationProperties) {
+        return ZeebeClientImpl.buildChannel(configurationProperties);
+      }
     }
   }
 
@@ -67,7 +81,7 @@ public class ZeebeClientStarterAutoConfigurationTest {
     assertThat(autoConfiguration).isNotNull();
     assertThat(zeebeClient).isNotNull();
     assertThat(zeebeClientManagedChannelFactory).isNotNull();
-    assertThat(zeebeClientManagedChannelFactory).isInstanceOf(ZeebeClientAllAutoConfiguration.DefaultZeebeClientManagedChannelFactory.class);
+    assertThat(zeebeClientManagedChannelFactory).isInstanceOf(TestConfig.TestZeebeClientManagedChannelFactory.class);
     Map<String, JsonMapper> jsonMapperBeans = applicationContext.getBeansOfType(JsonMapper.class);
     Object objectMapper = ReflectionTestUtils.getField(jsonMapper, "objectMapper");
 

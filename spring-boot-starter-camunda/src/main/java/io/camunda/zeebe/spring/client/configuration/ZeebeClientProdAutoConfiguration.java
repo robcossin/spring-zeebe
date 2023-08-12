@@ -32,10 +32,12 @@ public class ZeebeClientProdAutoConfiguration {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private final ZeebeClientConfigurationProperties configurationProperties;
+  private final ZeebeClientManagedChannelFactory zeebeClientManagedChannelFactory;
   private final ZeebeClientExecutorService zeebeClientExecutorService;
 
-  public ZeebeClientProdAutoConfiguration(ZeebeClientConfigurationProperties configurationProperties, ZeebeClientExecutorService zeebeClientExecutorService, JsonMapper jsonMapper) {
+  public ZeebeClientProdAutoConfiguration(ZeebeClientConfigurationProperties configurationProperties, ZeebeClientExecutorService zeebeClientExecutorService, JsonMapper jsonMapper, ZeebeClientManagedChannelFactory zeebeClientManagedChannelFactory) {
     this.configurationProperties = configurationProperties;
+    this.zeebeClientManagedChannelFactory = zeebeClientManagedChannelFactory;
     configurationProperties.setJsonMapper(jsonMapper); // Replace JsonMapper proxy (because of lazy) with real bean
     configurationProperties.applyOverrides(); // make sure environment variables and other legacy config options are taken into account (duplicate, also done by  qPostConstruct, whatever)
 
@@ -49,11 +51,11 @@ public class ZeebeClientProdAutoConfiguration {
 
     LOG.info("Creating ZeebeClient using ZeebeClientConfiguration [" + configurationProperties + "]");
     if (zeebeClientExecutorService!=null) {
-      ManagedChannel managedChannel = ZeebeClientImpl.buildChannel(configurationProperties);
+      ManagedChannel managedChannel = this.zeebeClientManagedChannelFactory.createChannel(configurationProperties);
       GatewayGrpc.GatewayStub gatewayStub = ZeebeClientImpl.buildGatewayStub(managedChannel, configurationProperties);
       return new ZeebeClientImpl(configurationProperties, managedChannel, gatewayStub, zeebeClientExecutorService.get());
     } else {
-      return new ZeebeClientImpl(configurationProperties);
+      return new ZeebeClientImpl(configurationProperties, zeebeClientManagedChannelFactory.createChannel(configurationProperties));
     }
   }
   // TODO: Interceptors
